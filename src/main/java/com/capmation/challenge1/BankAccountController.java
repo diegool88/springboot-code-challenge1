@@ -3,6 +3,7 @@ package com.capmation.challenge1;
 import java.net.URI;
 import java.security.Principal;
 import java.util.List;
+import java.util.Optional;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -51,8 +52,8 @@ public class BankAccountController {
     }
 	
 	@PostMapping
-    private ResponseEntity<Void> createBankAccount(@RequestBody BankAccount newBankAccountRequest, UriComponentsBuilder ucb) {
-        BankAccount savedBankAccount = null; //TODO: Using the repository create a new bank account
+    private ResponseEntity<Void> createBankAccount(@RequestBody BankAccount newBankAccountRequest, UriComponentsBuilder ucb, Principal principal) {
+        BankAccount savedBankAccount = bankAccountRepository.save(new BankAccount(null, 0.00, newBankAccountRequest.accountType(), principal.getName()));
         URI locationOfNewBankAccount = ucb
                 .path("bankaccounts/{id}")
                 .buildAndExpand(savedBankAccount.id())
@@ -60,7 +61,7 @@ public class BankAccountController {
         return ResponseEntity.created(locationOfNewBankAccount).build();
     }
 	
-	@PatchMapping("/{requestedId}/deposit")
+	@PutMapping("/{requestedId}/deposit")
     private ResponseEntity<Void> putDepositInBankAccount(@PathVariable Long requestedId, @RequestBody DepositRecord depositRecord) {
 		/* TODO
 		 * You need to: 
@@ -69,11 +70,18 @@ public class BankAccountController {
 		 * 3. Return OK response code (200) to the consumer with the updated resource in the response body.
 		 * 4. If the account was not found return the corresponding HTTP response.
 		 * */
-		return ResponseEntity.badRequest().build();
+		Optional<BankAccount> bankAccount = bankAccountRepository.findById(requestedId);
+		if(bankAccount.isPresent()) {
+			BankAccount retrievedbankAccount = bankAccount.get();
+			BankAccount updatedBankAccount = new BankAccount(retrievedbankAccount.id(), retrievedbankAccount.amount() + depositRecord.amount(), retrievedbankAccount.accountType(), retrievedbankAccount.owner());
+			bankAccountRepository.save(updatedBankAccount);
+			return ResponseEntity.noContent().build();		
+		}
+		return ResponseEntity.notFound().build();
     }
 	
-	@PatchMapping("/{requestedId}/withdrawal")
-    private ResponseEntity<Void> putWithdrawalInBankAccount(@PathVariable Long requestedId, @RequestBody WithdrawalRecord withdrawalRecord) {
+	@PutMapping("/{requestedId}/withdrawal")
+    private ResponseEntity<Void> putWithdrawalInBankAccount(@PathVariable Long requestedId, @RequestBody WithdrawalRecord withdrawalRecord, Principal principal) {
 		/* TODO
 		 * You need to: 
 		 * 1. Verify the existence of bank account. (Only the bank account owner is able to perform a withdrawal)
@@ -82,11 +90,17 @@ public class BankAccountController {
 		 * 4. If the account was not found return the corresponding HTTP response. If the user trying to make the withdrawal is not the owner
 		 * then return a not found response as well.
 		 * */
-		return ResponseEntity.badRequest().build();
+		BankAccount bankAccount = findBankAccount(requestedId, principal);
+		if(bankAccount != null) {
+			BankAccount updatedBankAccount = new BankAccount(bankAccount.id(), bankAccount.amount() - withdrawalRecord.amount(), bankAccount.accountType(), bankAccount.owner());
+			bankAccountRepository.save(updatedBankAccount);
+			return ResponseEntity.noContent().build();		
+		}
+		return ResponseEntity.notFound().build();
     }
 	
-	@PatchMapping("/{requestedId}/tranference")
-    private ResponseEntity<Void> putTransferenceInBankAccount(@PathVariable Long requestedId, @RequestBody TransferenceRecord transferenceRecord) {
+	@PutMapping("/{requestedId}/transference")
+    private ResponseEntity<Void> putTransferenceInBankAccount(@PathVariable Long requestedId, @RequestBody TransferenceRecord transferenceRecord, Principal principal) {
 		/* TODO
 		 * You need to: 
 		 * 1. Verify the existence of bank account. (Only the bank account owner is able to perform a transference)
@@ -96,7 +110,23 @@ public class BankAccountController {
 		 * 4. If the account was not found return the corresponding HTTP response. If the user trying to make the withdrawal is not the owner
 		 * then return a not found response as well.
 		 * */
-		return ResponseEntity.badRequest().build();
+		//Validate destination account exists
+		Optional<BankAccount> destinationBankAccount = bankAccountRepository.findById(transferenceRecord.destinationId());
+		if(!destinationBankAccount.isPresent()) {
+			return ResponseEntity.badRequest().build();		
+		}
+		BankAccount bankAccount = findBankAccount(requestedId, principal);
+		if(bankAccount != null) {
+			//Debit source account
+			BankAccount updatedBankAccount = new BankAccount(bankAccount.id(), bankAccount.amount() - transferenceRecord.amount(), bankAccount.accountType(), bankAccount.owner());
+			bankAccountRepository.save(updatedBankAccount);
+			//credit destination account
+			BankAccount retrievedbankAccount = destinationBankAccount.get();
+			updatedBankAccount = new BankAccount(retrievedbankAccount.id(), retrievedbankAccount.amount() + transferenceRecord.amount(), retrievedbankAccount.accountType(), retrievedbankAccount.owner());
+			bankAccountRepository.save(updatedBankAccount);
+			return ResponseEntity.noContent().build();		
+		}
+		return ResponseEntity.notFound().build();
     }
 	
 	private BankAccount findBankAccount(Long requestedId, Principal principal) {
