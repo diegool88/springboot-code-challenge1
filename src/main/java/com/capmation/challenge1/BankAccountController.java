@@ -61,8 +61,8 @@ public class BankAccountController {
         return ResponseEntity.created(locationOfNewBankAccount).build();
     }
 	
-	@PutMapping("/{requestedId}/deposit")
-    private ResponseEntity<Void> putDepositInBankAccount(@PathVariable Long requestedId, @RequestBody DepositRecord depositRecord) {
+	@PatchMapping("/{requestedId}/deposit")
+    private ResponseEntity<Void> patchDepositInBankAccount(@PathVariable Long requestedId, @RequestBody DepositRecord depositRecord) {
 		/* TODO
 		 * You need to: 
 		 * 1. Verify the existence of bank account. (Any role can make a deposit)
@@ -70,18 +70,14 @@ public class BankAccountController {
 		 * 3. Return OK response code (200) to the consumer with the updated resource in the response body.
 		 * 4. If the account was not found return the corresponding HTTP response.
 		 * */
-		Optional<BankAccount> bankAccount = bankAccountRepository.findById(requestedId);
-		if(bankAccount.isPresent()) {
-			BankAccount retrievedbankAccount = bankAccount.get();
-			BankAccount updatedBankAccount = new BankAccount(retrievedbankAccount.id(), retrievedbankAccount.amount() + depositRecord.amount(), retrievedbankAccount.accountType(), retrievedbankAccount.owner());
-			bankAccountRepository.save(updatedBankAccount);
+		if(depositInBankAccount(requestedId, depositRecord.amount()) != null) {
 			return ResponseEntity.noContent().build();		
 		}
 		return ResponseEntity.notFound().build();
     }
 	
-	@PutMapping("/{requestedId}/withdrawal")
-    private ResponseEntity<Void> putWithdrawalInBankAccount(@PathVariable Long requestedId, @RequestBody WithdrawalRecord withdrawalRecord, Principal principal) {
+	@PatchMapping("/{requestedId}/withdrawal")
+    private ResponseEntity<Void> patchWithdrawalInBankAccount(@PathVariable Long requestedId, @RequestBody WithdrawalRecord withdrawalRecord, Principal principal) {
 		/* TODO
 		 * You need to: 
 		 * 1. Verify the existence of bank account. (Only the bank account owner is able to perform a withdrawal)
@@ -90,17 +86,14 @@ public class BankAccountController {
 		 * 4. If the account was not found return the corresponding HTTP response. If the user trying to make the withdrawal is not the owner
 		 * then return a not found response as well.
 		 * */
-		BankAccount bankAccount = findBankAccount(requestedId, principal);
-		if(bankAccount != null) {
-			BankAccount updatedBankAccount = new BankAccount(bankAccount.id(), bankAccount.amount() - withdrawalRecord.amount(), bankAccount.accountType(), bankAccount.owner());
-			bankAccountRepository.save(updatedBankAccount);
-			return ResponseEntity.noContent().build();		
+		if (withdrawInBankAccount(requestedId, withdrawalRecord.amount(), principal) != null) {
+			return ResponseEntity.noContent().build();
 		}
 		return ResponseEntity.notFound().build();
     }
 	
-	@PutMapping("/{requestedId}/transference")
-    private ResponseEntity<Void> putTransferenceInBankAccount(@PathVariable Long requestedId, @RequestBody TransferenceRecord transferenceRecord, Principal principal) {
+	@PatchMapping("/{requestedId}/transference")
+    private ResponseEntity<Void> patchTransferenceInBankAccount(@PathVariable Long requestedId, @RequestBody TransferenceRecord transferenceRecord, Principal principal) {
 		/* TODO
 		 * You need to: 
 		 * 1. Verify the existence of bank account. (Only the bank account owner is able to perform a transference)
@@ -110,24 +103,34 @@ public class BankAccountController {
 		 * 4. If the account was not found return the corresponding HTTP response. If the user trying to make the withdrawal is not the owner
 		 * then return a not found response as well.
 		 * */
-		//Validate destination account exists
-		Optional<BankAccount> destinationBankAccount = bankAccountRepository.findById(transferenceRecord.destinationId());
-		if(!destinationBankAccount.isPresent()) {
-			return ResponseEntity.badRequest().build();		
-		}
-		BankAccount bankAccount = findBankAccount(requestedId, principal);
-		if(bankAccount != null) {
-			//Debit source account
-			BankAccount updatedBankAccount = new BankAccount(bankAccount.id(), bankAccount.amount() - transferenceRecord.amount(), bankAccount.accountType(), bankAccount.owner());
-			bankAccountRepository.save(updatedBankAccount);
+		//Validate destination bank account & Debit source account
+		if(bankAccountRepository.findById(transferenceRecord.destinationId()).isPresent() && withdrawInBankAccount(requestedId, transferenceRecord.amount(), principal) != null) {
 			//credit destination account
-			BankAccount retrievedbankAccount = destinationBankAccount.get();
-			updatedBankAccount = new BankAccount(retrievedbankAccount.id(), retrievedbankAccount.amount() + transferenceRecord.amount(), retrievedbankAccount.accountType(), retrievedbankAccount.owner());
-			bankAccountRepository.save(updatedBankAccount);
+			depositInBankAccount(transferenceRecord.destinationId(), transferenceRecord.amount());
 			return ResponseEntity.noContent().build();		
 		}
 		return ResponseEntity.notFound().build();
     }
+	
+	private BankAccount withdrawInBankAccount(Long requestedId, Double amount, Principal principal) {
+		BankAccount bankAccount = findBankAccount(requestedId, principal);
+		if(bankAccount != null) {
+			BankAccount updatedBankAccount = new BankAccount(bankAccount.id(), bankAccount.amount() - amount, bankAccount.accountType(), bankAccount.owner());
+			bankAccountRepository.save(updatedBankAccount);
+			return updatedBankAccount;		
+		}
+		return null;
+	}
+	
+	private BankAccount depositInBankAccount(Long requestedId, Double amount) {
+		Optional<BankAccount> bankAccount = bankAccountRepository.findById(requestedId);
+		if(bankAccount.isPresent()) {
+			BankAccount updatedBankAccount = new BankAccount(bankAccount.get().id(), bankAccount.get().amount() + amount, bankAccount.get().accountType(), bankAccount.get().owner());
+			bankAccountRepository.save(updatedBankAccount);
+			return 	updatedBankAccount;
+		}
+		return null;
+	}
 	
 	private BankAccount findBankAccount(Long requestedId, Principal principal) {
         return bankAccountRepository.findByIdAndOwner(requestedId, principal.getName());

@@ -5,6 +5,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.net.URI;
 import java.util.Date;
 
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -13,6 +15,7 @@ import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.client.HttpComponentsClientHttpRequestFactory;
 import org.springframework.test.annotation.DirtiesContext;
 
 import net.minidev.json.JSONArray;
@@ -25,6 +28,11 @@ class SpringbootCodeChallenge1ApplicationTests {
 	
 	@Autowired
     TestRestTemplate restTemplate;
+	
+	@BeforeEach
+	public void setup() {
+		restTemplate.getRestTemplate().setRequestFactory(new HttpComponentsClientHttpRequestFactory());
+	}
 
 	@Test
     @DirtiesContext
@@ -111,7 +119,7 @@ class SpringbootCodeChallenge1ApplicationTests {
     	HttpEntity<DepositRecord> request = new HttpEntity<>(depositRecord);
     	ResponseEntity<Void> createResponse = restTemplate
                 .withBasicAuth("user1", "user1$$pwd")
-                .exchange("/bankaccounts/1001/deposit", HttpMethod.PUT, request ,Void.class);
+                .exchange("/bankaccounts/1001/deposit", HttpMethod.PATCH, request ,Void.class);
         assertThat(createResponse.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
         
         ResponseEntity<String> response = restTemplate
@@ -133,7 +141,7 @@ class SpringbootCodeChallenge1ApplicationTests {
     	HttpEntity<WithdrawalRecord> request = new HttpEntity<>(withdrawalRecord);
     	ResponseEntity<Void> createResponse = restTemplate
                 .withBasicAuth("user1", "user1$$pwd")
-                .exchange("/bankaccounts/1001/withdrawal", HttpMethod.PUT, request ,Void.class);
+                .exchange("/bankaccounts/1001/withdrawal", HttpMethod.PATCH, request ,Void.class);
         assertThat(createResponse.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
         
         ResponseEntity<String> response = restTemplate
@@ -154,7 +162,7 @@ class SpringbootCodeChallenge1ApplicationTests {
     	HttpEntity<TransferenceRecord> request = new HttpEntity<>(transferenceRecord);
     	ResponseEntity<Void> createResponse = restTemplate
                 .withBasicAuth("user2", "user2$$pwd")
-                .exchange("/bankaccounts/1004/transference", HttpMethod.PUT, request ,Void.class);
+                .exchange("/bankaccounts/1004/transference", HttpMethod.PATCH, request ,Void.class);
         assertThat(createResponse.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
         
         ResponseEntity<String> response = restTemplate
